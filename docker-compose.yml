@@ -2,7 +2,6 @@ version: "3.8"
 services:
   evfhq-downloader:
     build: .
-    image: anjieyang/evfhq-downloader
     ports:
       - "5672:5672"
     environment:
