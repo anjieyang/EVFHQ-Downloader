@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+  evfhq-downloader:
+    build: .
+    image: anjieyang/evfhq-downloader
+    ports:
+      - "5672:5672"
+    environment:
+      RABBITMQ_HOST: "your_rabbitmq_host"
+      RABBITMQ_PORT: 5672
+      SAVE_DIR: "your_docker_save_dir"
+      SERVER_ID: 1
+    volumes:
+      - "your_machine_save_dir:your_docker_save_dir"
+
+volumes:
+  video-data:
+  rabbitmq-data:
+
+networks:
+  default:
