@@ -16,12 +16,12 @@ For deploying EVFHQ-Downloader using Docker Compose and building the Docker imag
 
 If you prefer a quick and straightforward deployment using the Docker image from DockerHub.
 
-1. Download [dockerhub_deploy.yml](https://drive.google.com/uc?export=download&id=1-j1V0hJ-XvDZNRAO5kSr9wVOWTOhT_WD).
+1. Download [evfhq-downloader-deploy.yml](https://drive.google.com/uc?export=download&id=1-j1V0hJ-XvDZNRAO5kSr9wVOWTOhT_WD).
 
 2. Replace the placeholder values (`your_rabbitmq_host`, `your_docker_save_dir`, `your_machine_save_dir`, `your_docker_save_dir`) with your actual configurations.
 
 3. Run the following command to start the EVFHQ-Fetcher service:
 
 ```bash
-docker-compose -f dockerhub_deploy.yml up -d
+docker-compose -f evfhq-downloader-deploy.yml up -d
 ```
