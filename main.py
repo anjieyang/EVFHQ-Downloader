@@ -18,7 +18,7 @@ def setup_rabbitmq_connection():
                     host=os.getenv('RABBITMQ_HOST'),
                     port=int(os.getenv('RABBITMQ_PORT')),
                     heartbeat=3600,
-                    blocked_connection_timeout=600,
+                    blocked_connection_timeout=1800,
                     connection_attempts=5,
                     retry_delay=5
                 ))
@@ -40,12 +40,11 @@ def request_task(channel, server_id):
     logging.info("Requested new task for server_id: %s", server_id)
 
 
-def handle_download(channel, method, properties, body, args):
-    logging.info(f"Received raw message: {body.decode()}")
+def handle_download(channel, method, properties, body, save_dir, server_id):
+    logging.info(f"Received task message: {body.decode()}")
     data = json.loads(body.decode())
     video_id = data['video_id']
     resolution = data['resolution']
-    save_dir, server_id = args
 
     try:
         response = VideoDownloader.download_video(
@@ -58,32 +57,31 @@ def handle_download(channel, method, properties, body, args):
             body=json.dumps(response),
             properties=pika.BasicProperties(delivery_mode=2)
         )
+        channel.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
         logging.error(
             f"Error processing download for video_id {video_id}: {str(e)}")
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-    else:
-        channel.basic_ack(delivery_tag=method.delivery_tag)
+    finally:
         request_task(channel, server_id)
 
 
-def consume_tasks(channel, queue_name, callback):
+def consume_tasks(channel, queue_name, save_dir, server_id):
     while True:
         try:
             channel.basic_consume(
                 queue=queue_name,
-                on_message_callback=callback,
+                on_message_callback=functools.partial(
+                    handle_download, save_dir=save_dir, server_id=server_id),
                 auto_ack=False
             )
             channel.start_consuming()
         except pika.exceptions.ConnectionClosedByBroker:
-            logging.warning(
+            logging.error(
                 "Connection closed by broker, attempting to reconnect...")
-            time.sleep(5)
             channel = setup_rabbitmq_connection().channel()
         except pika.exceptions.AMQPConnectionError:
             logging.error("Connection lost, attempting to reconnect...")
-            time.sleep(5)
             channel = setup_rabbitmq_connection().channel()
         except KeyboardInterrupt:
             logging.info("Consumer stopped by user.")
@@ -100,24 +98,15 @@ def main():
     server_id = os.getenv('SERVER_ID')
     save_dir = os.getenv('SAVE_DIR')
 
-    handle_download_task = functools.partial(
-        handle_download, args=(save_dir, server_id))
-
     request_task(channel, server_id)
 
     consumer_thread = threading.Thread(target=consume_tasks, args=(
-        channel, "video_download_queue", handle_download_task))
+        channel, "video_download_queue", save_dir, server_id))
     consumer_thread.start()
 
     logging.info(
         f"Downloader on server {server_id} is running. Waiting for download tasks...")
-    try:
-        consumer_thread.join()
-    except KeyboardInterrupt:
-        logging.info("Stopping downloader.")
-    finally:
-        if connection:
-            connection.close()
+    consumer_thread.join()
 
 
 if __name__ == "__main__":
